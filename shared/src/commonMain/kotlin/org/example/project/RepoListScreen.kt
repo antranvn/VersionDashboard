@@ -66,13 +66,18 @@ fun RepoListScreen() {
             Button(
                 enabled = projectKey.isNotBlank() && !loading,
                 onClick = {
+                    val key = projectKey.trim()
                     scope.launch {
                         loading = true
                         error = null
+                        println("[RepoList] Fetching repos for project '$key' via $PROXY_BASE_URL")
                         try {
-                            repos = client.listRepositories(projectKey.trim())
+                            val result = client.listRepositories(key)
+                            println("[RepoList] Loaded ${result.size} repos for project '$key'")
+                            repos = result
                         } catch (e: Throwable) {
-                            error = e.message ?: e.toString()
+                            println("[RepoList] Fetch failed for project '$key': ${e::class.simpleName}: ${e.message}")
+                            error = friendlyError(e)
                             repos = emptyList()
                         } finally {
                             loading = false
@@ -99,6 +104,29 @@ fun RepoListScreen() {
                 items(repos) { repo -> RepoRow(repo) }
             }
         }
+    }
+}
+
+/**
+ * Turns a raw fetch exception into something actionable. The browser reports any
+ * network-level failure as the opaque "Failed to fetch", so we can't know the exact
+ * cause from the exception alone — but that error almost always means the proxy is
+ * unreachable, so we point the user at the usual culprits.
+ */
+private fun friendlyError(e: Throwable): String {
+    val raw = e.message ?: e.toString()
+    val looksLikeNetwork = listOf("Failed to fetch", "NetworkError", "ERR_CONNECTION", "ECONNREFUSED")
+        .any { raw.contains(it, ignoreCase = true) }
+    return if (looksLikeNetwork) {
+        buildString {
+            appendLine("Couldn't reach the proxy at $PROXY_BASE_URL.")
+            appendLine("• Is it running?  ./gradlew :proxy:run")
+            appendLine("• Is bitbucket.token set in local.properties?")
+            appendLine("• Are you on the VPN that can reach the Bitbucket host?")
+            append("(details: $raw — see the browser Network tab for the exact reason)")
+        }
+    } else {
+        "$raw\n(see the browser Console / proxy terminal for details)"
     }
 }
 

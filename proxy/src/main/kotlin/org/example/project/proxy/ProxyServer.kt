@@ -66,12 +66,15 @@ fun main() {
                     append(config.baseUrl).append("/rest/").append(tail)
                     if (query.isNotEmpty()) append('?').append(query)
                 }
+                println("--> GET /rest/$tail${if (query.isNotEmpty()) "?$query" else ""}  ->  $target")
                 try {
                     val resp: HttpResponse = forwarder.get(target) {
                         header(HttpHeaders.Authorization, "Bearer ${config.token}")
                     }
+                    println("<-- ${resp.status} from $target")
                     call.respondText(resp.bodyAsText(), ContentType.Application.Json, resp.status)
                 } catch (e: Throwable) {
+                    System.err.println("!!! forward to $target failed: ${e::class.simpleName}: ${e.message}")
                     call.respondText(
                         """{"error":"proxy_forward_failed","message":${jsonString(e.message ?: e.toString())}}""",
                         ContentType.Application.Json,
