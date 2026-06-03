@@ -4,18 +4,23 @@ Guidance for Claude Code when working in this repository.
 
 ## Project
 
-VersionDashboard — a Kotlin Multiplatform / Compose Multiplatform app targeting the Web (Kotlin/Wasm and Kotlin/JS).
+VersionDashboard — a Compose Multiplatform **Desktop (JVM)** app that lists repositories
+from a Bitbucket Server / Data Center instance via its REST API v1.0.
 
-- `shared/` — shared code and Compose UI (`commonMain`), with `wasmJsMain` / `jsMain` platform sources.
-- `webApp/` — runnable web app; `main.kt` mounts `App()` into a `ComposeViewport`.
+- `shared/` — Compose UI (`RepoListScreen`, `App`) and the `BitbucketClient` (`commonMain`),
+  with a `jvm` target.
+- `desktopApp/` — desktop entry point (`Main.kt`); reads `bitbucket.baseUrl` / `bitbucket.token`
+  from `local.properties` at runtime, builds the client, and launches the window.
 - `gradle/libs.versions.toml` — version catalog for all dependencies.
 
+Note: a JVM desktop client talks to Bitbucket directly — no proxy and no CORS (those were
+only needed for the earlier browser target). Requires network/VPN access to the host.
+
 ### Run
-- Wasm: `./gradlew :webApp:wasmJsBrowserDevelopmentRun`
-- JS: `./gradlew :webApp:jsBrowserDevelopmentRun`
+- `./gradlew :desktopApp:run`  (set `bitbucket.token` in `local.properties` first)
 
 ### Test
-- `./gradlew :shared:wasmJsTest` / `./gradlew :shared:jsTest`
+- `./gradlew :shared:jvmTest`
 
 ## Rules
 

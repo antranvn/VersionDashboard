@@ -31,14 +31,9 @@ import kotlinx.coroutines.launch
 import org.example.project.bitbucket.BitbucketClient
 import org.example.project.bitbucket.Repository
 
-/** The local dev proxy from the `:proxy` module. Start it with `./gradlew :proxy:run`. */
-private const val PROXY_BASE_URL = "http://localhost:8081"
-
 @Composable
-fun RepoListScreen() {
+fun RepoListScreen(client: BitbucketClient) {
     val scope = rememberCoroutineScope()
-    // No credentials here — the proxy injects them server-side.
-    val client = remember { BitbucketClient(baseUrl = PROXY_BASE_URL) }
 
     var projectKey by remember { mutableStateOf("") }
     var repos by remember { mutableStateOf<List<Repository>>(emptyList()) }
@@ -70,7 +65,7 @@ fun RepoListScreen() {
                     scope.launch {
                         loading = true
                         error = null
-                        println("[RepoList] Fetching repos for project '$key' via $PROXY_BASE_URL")
+                        println("[RepoList] Fetching repos for project '$key'")
                         try {
                             val result = client.listRepositories(key)
                             println("[RepoList] Loaded ${result.size} repos for project '$key'")
@@ -108,25 +103,25 @@ fun RepoListScreen() {
 }
 
 /**
- * Turns a raw fetch exception into something actionable. The browser reports any
- * network-level failure as the opaque "Failed to fetch", so we can't know the exact
- * cause from the exception alone — but that error almost always means the proxy is
- * unreachable, so we point the user at the usual culprits.
+ * Turns a raw exception into something actionable, pointing at the usual culprits
+ * when the Bitbucket host can't be reached.
  */
 private fun friendlyError(e: Throwable): String {
     val raw = e.message ?: e.toString()
-    val looksLikeNetwork = listOf("Failed to fetch", "NetworkError", "ERR_CONNECTION", "ECONNREFUSED")
-        .any { raw.contains(it, ignoreCase = true) }
+    val looksLikeNetwork = listOf(
+        "UnknownHost", "UnresolvedAddress", "Connection refused", "ConnectException",
+        "timeout", "timed out", "SSLHandshake", "No route to host",
+    ).any { raw.contains(it, ignoreCase = true) }
     return if (looksLikeNetwork) {
         buildString {
-            appendLine("Couldn't reach the proxy at $PROXY_BASE_URL.")
-            appendLine("• Is it running?  ./gradlew :proxy:run")
-            appendLine("• Is bitbucket.token set in local.properties?")
-            appendLine("• Are you on the VPN that can reach the Bitbucket host?")
-            append("(details: $raw — see the browser Network tab for the exact reason)")
+            appendLine("Couldn't reach the Bitbucket server.")
+            appendLine("• Are you on the VPN that can reach the host?")
+            appendLine("• Is bitbucket.baseUrl correct in local.properties?")
+            appendLine("• Is bitbucket.token set and valid?")
+            append("(details: $raw)")
         }
     } else {
-        "$raw\n(see the browser Console / proxy terminal for details)"
+        "$raw\n(see the run terminal for the full log)"
     }
 }
 

@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
@@ -8,16 +6,8 @@ plugins {
 }
 
 kotlin {
-    js {
-        browser()
-    }
-    
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        browser()
-    }
-    
-    
+    jvm()
+
     sourceSets {
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -35,12 +25,9 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
-        jsMain.dependencies {
-            implementation(libs.wrappers.browser)
-            implementation(libs.ktor.client.js)
-        }
-        wasmJsMain.dependencies {
-            implementation(libs.ktor.client.js)
+        jvmMain.dependencies {
+            // JVM HTTP engine for the Ktor client (no proxy needed on desktop).
+            implementation(libs.ktor.client.cio)
         }
     }
 }

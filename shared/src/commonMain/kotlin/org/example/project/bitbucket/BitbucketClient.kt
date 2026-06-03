@@ -14,14 +14,9 @@ import kotlinx.serialization.json.Json
 /**
  * Minimal read-only client for the Bitbucket **Server / Data Center** REST API v1.0.
  *
- * Two usage modes:
- *  - **Via proxy (recommended for the web app):** leave [token] null and point
- *    [baseUrl] at the local proxy (e.g. "http://localhost:8081"). The proxy injects
- *    the Bearer token and handles CORS, so no secret touches the browser.
- *  - **Direct (e.g. from a JVM/test, no browser CORS):** pass an HTTP access [token]
- *    and set [baseUrl] to the server root (e.g. "https://bitbucketp.id.dbsnet.com").
- *
- * Either way, [baseUrl] is the host root; the "/rest/api/1.0/..." path is appended here.
+ * Pass an HTTP access [token] (sent as `Authorization: Bearer …`) and set [baseUrl] to
+ * the server root (e.g. "https://bitbucketp.id.dbsnet.com"); the "/rest/api/1.0/..." path
+ * is appended here. [token] may be null for unauthenticated/anonymous endpoints.
  */
 class BitbucketClient(
     token: String? = null,
