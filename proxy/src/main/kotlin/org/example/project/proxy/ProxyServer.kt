@@ -19,39 +19,37 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import java.io.File
-import java.util.Base64
 import java.util.Properties
 
 /**
- * Minimal local development proxy for the Bitbucket Cloud REST API v2.
+ * Minimal local development proxy for a Bitbucket **Server / Data Center** instance.
  *
  * Why this exists:
- *  - The browser can't call api.bitbucket.org directly (CORS), and we don't want
- *    the Bitbucket credential shipped in the public web bundle.
- *  - This server holds the credential server-side, injects HTTP Basic auth, adds
- *    permissive CORS headers (DEV ONLY), and forwards any `/2.0/...` path through
- *    to Bitbucket unchanged. The web app calls this instead of Bitbucket.
+ *  - The browser can't call the Bitbucket host directly (CORS), and we don't want
+ *    the HTTP access token shipped in the public web bundle.
+ *  - This server holds the token server-side, injects "Authorization: Bearer ...",
+ *    adds permissive CORS headers (DEV ONLY), and forwards any `/rest/...` path
+ *    through to the configured Bitbucket host. The web app calls this instead.
  *
- * Credentials are read from (in order):
- *  1. BITBUCKET_USERNAME / BITBUCKET_APP_PASSWORD environment variables
- *  2. bitbucket.username / bitbucket.appPassword in local.properties (repo root)
+ * Config is read from (env wins over local.properties):
+ *  - BITBUCKET_BASE_URL / bitbucket.baseUrl  (default: https://bitbucketp.id.dbsnet.com)
+ *  - BITBUCKET_TOKEN     / bitbucket.token   (required; an HTTP access token)
  *
  * Run: ./gradlew :proxy:run
+ *
+ * Note: the host must be reachable from this machine (corporate VPN/network). If it
+ * uses an internal CA, the JVM running this proxy must trust that CA.
  */
 private const val PORT = 8081
+private const val DEFAULT_BASE_URL = "https://bitbucketp.id.dbsnet.com"
+
+private data class ProxyConfig(val baseUrl: String, val token: String)
 
 fun main() {
-    val (user, pass) = loadCredentials()
+    val config = loadConfig()
+    val forwarder = HttpClient(ClientCIO) { expectSuccess = false }
 
-    // Set the Basic auth header directly rather than via the client Auth plugin: a
-    // forwarding proxy should pass error responses (e.g. 401) straight through, not
-    // try to parse Bitbucket's WWW-Authenticate challenge and retry.
-    val authHeader = "Basic " + Base64.getEncoder().encodeToString("$user:$pass".toByteArray())
-    val forwarder = HttpClient(ClientCIO) {
-        expectSuccess = false
-    }
-
-    println("Bitbucket proxy listening on http://localhost:$PORT (forwarding as '$user')")
+    println("Bitbucket proxy listening on http://localhost:$PORT -> ${config.baseUrl}")
 
     embeddedServer(ServerCIO, port = PORT) {
         install(CORS) {
@@ -60,18 +58,17 @@ fun main() {
             allowMethod(HttpMethod.Get)
         }
         routing {
-            // Transparently forward any /2.0/* path to Bitbucket, preserving the query string.
-            get("/2.0/{path...}") {
+            // Transparently forward any /rest/* path to the Bitbucket host, preserving the query string.
+            get("/rest/{path...}") {
                 val tail = call.parameters.getAll("path").orEmpty().joinToString("/")
                 val query = call.request.queryString()
                 val target = buildString {
-                    append("https://api.bitbucket.org/2.0/")
-                    append(tail)
+                    append(config.baseUrl).append("/rest/").append(tail)
                     if (query.isNotEmpty()) append('?').append(query)
                 }
                 try {
                     val resp: HttpResponse = forwarder.get(target) {
-                        header(HttpHeaders.Authorization, authHeader)
+                        header(HttpHeaders.Authorization, "Bearer ${config.token}")
                     }
                     call.respondText(resp.bodyAsText(), ContentType.Application.Json, resp.status)
                 } catch (e: Throwable) {
@@ -90,20 +87,23 @@ fun main() {
 private fun jsonString(value: String): String =
     "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ") + "\""
 
-private fun loadCredentials(): Pair<String, String> {
-    System.getenv("BITBUCKET_USERNAME")?.let { u ->
-        System.getenv("BITBUCKET_APP_PASSWORD")?.let { p -> return u to p }
-    }
+private fun loadConfig(): ProxyConfig {
+    val props = Properties()
     for (path in listOf("local.properties", "../local.properties")) {
         val file = File(path)
-        if (!file.exists()) continue
-        val props = Properties().apply { file.inputStream().use { load(it) } }
-        val user = props.getProperty("bitbucket.username")
-        val pass = props.getProperty("bitbucket.appPassword")
-        if (!user.isNullOrBlank() && !pass.isNullOrBlank()) return user to pass
+        if (file.exists()) {
+            file.inputStream().use { props.load(it) }
+            break
+        }
     }
-    error(
-        "No Bitbucket credentials found. Set BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD " +
-            "environment variables, or add bitbucket.username and bitbucket.appPassword to local.properties.",
-    )
+    val baseUrl = (System.getenv("BITBUCKET_BASE_URL")?.takeIf { it.isNotBlank() }
+        ?: props.getProperty("bitbucket.baseUrl")?.takeIf { it.isNotBlank() }
+        ?: DEFAULT_BASE_URL).trimEnd('/')
+    val token = System.getenv("BITBUCKET_TOKEN")?.takeIf { it.isNotBlank() }
+        ?: props.getProperty("bitbucket.token")?.takeIf { it.isNotBlank() }
+        ?: error(
+            "No Bitbucket token found. Set the BITBUCKET_TOKEN environment variable, " +
+                "or add bitbucket.token to local.properties (an HTTP access token).",
+        )
+    return ProxyConfig(baseUrl, token)
 }

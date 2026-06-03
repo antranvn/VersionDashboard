@@ -40,7 +40,7 @@ fun RepoListScreen() {
     // No credentials here — the proxy injects them server-side.
     val client = remember { BitbucketClient(baseUrl = PROXY_BASE_URL) }
 
-    var workspace by remember { mutableStateOf("") }
+    var projectKey by remember { mutableStateOf("") }
     var repos by remember { mutableStateOf<List<Repository>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -56,21 +56,21 @@ fun RepoListScreen() {
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
-                value = workspace,
-                onValueChange = { workspace = it },
-                label = { Text("Workspace slug") },
+                value = projectKey,
+                onValueChange = { projectKey = it },
+                label = { Text("Project key (e.g. CORE)") },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(12.dp))
             Button(
-                enabled = workspace.isNotBlank() && !loading,
+                enabled = projectKey.isNotBlank() && !loading,
                 onClick = {
                     scope.launch {
                         loading = true
                         error = null
                         try {
-                            repos = client.listRepositories(workspace.trim())
+                            repos = client.listRepositories(projectKey.trim())
                         } catch (e: Throwable) {
                             error = e.message ?: e.toString()
                             repos = emptyList()
@@ -92,7 +92,7 @@ fun RepoListScreen() {
                 style = MaterialTheme.typography.bodyMedium,
             )
             repos.isEmpty() -> Text(
-                "Enter a workspace slug and press Fetch.",
+                "Enter a project key and press Fetch.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -107,7 +107,10 @@ private fun RepoRow(repo: Repository) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(repo.name, style = MaterialTheme.typography.titleMedium)
-            Text(repo.fullName, style = MaterialTheme.typography.bodySmall)
+            Text(
+                listOfNotNull(repo.project?.key, repo.slug).joinToString("/"),
+                style = MaterialTheme.typography.bodySmall,
+            )
             repo.description?.takeIf { it.isNotBlank() }?.let {
                 Spacer(Modifier.height(4.dp))
                 Text(it, style = MaterialTheme.typography.bodyMedium)
@@ -115,9 +118,8 @@ private fun RepoRow(repo: Repository) {
             Spacer(Modifier.height(4.dp))
             Text(
                 buildString {
-                    append(if (repo.isPrivate) "private" else "public")
-                    repo.language?.takeIf { it.isNotBlank() }?.let { append(" • ").append(it) }
-                    repo.mainbranch?.name?.let { append(" • ").append(it) }
+                    append(if (repo.public) "public" else "private")
+                    repo.state?.takeIf { it.isNotBlank() }?.let { append(" • ").append(it) }
                 },
                 style = MaterialTheme.typography.labelSmall,
             )

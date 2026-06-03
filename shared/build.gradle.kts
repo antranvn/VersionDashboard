@@ -30,7 +30,6 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.contentNegotiation)
-            implementation(libs.ktor.client.auth)
             implementation(libs.ktor.serialization.kotlinx.json)
         }
         commonTest.dependencies {

@@ -1,39 +1,39 @@
 package org.example.project.bitbucket
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * A subset of the fields returned by the Bitbucket Cloud REST API v2.
- * Unknown fields are ignored (see [BitbucketClient]'s JSON config), so only
- * the properties actually needed are declared here.
+ * A subset of the fields returned by the Bitbucket **Server / Data Center**
+ * REST API v1.0 (https://{host}/rest/api/1.0). Unknown fields are ignored
+ * (see [BitbucketClient]'s JSON config), so only the needed properties are declared.
  */
 
-/** One page of a paginated Bitbucket response. */
+/** One page of a paginated Bitbucket Server response. */
 @Serializable
 data class Paginated<T>(
     val values: List<T> = emptyList(),
-    val page: Int? = null,
-    val size: Int? = null,
-    val pagelen: Int? = null,
-    /** Absolute URL of the next page, or null when this is the last page. */
-    val next: String? = null,
+    val size: Int = 0,
+    val limit: Int = 0,
+    val start: Int = 0,
+    val isLastPage: Boolean = true,
+    /** Start index of the next page; null/absent on the last page. */
+    val nextPageStart: Int? = null,
 )
 
 @Serializable
 data class Repository(
-    val uuid: String,
+    val id: Int,
+    val slug: String,
     val name: String,
-    @SerialName("full_name") val fullName: String,
-    @SerialName("is_private") val isPrivate: Boolean = false,
     val description: String? = null,
-    val language: String? = null,
-    @SerialName("updated_on") val updatedOn: String? = null,
-    @SerialName("created_on") val createdOn: String? = null,
-    val mainbranch: Branch? = null,
+    /** e.g. "AVAILABLE". */
+    val state: String? = null,
+    val public: Boolean = false,
+    val project: Project? = null,
 )
 
 @Serializable
-data class Branch(
-    val name: String,
+data class Project(
+    val key: String,
+    val name: String? = null,
 )
