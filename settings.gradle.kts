@@ -30,3 +30,4 @@ dependencyResolutionManagement {
 
 include(":shared")
 include(":webApp")
+include(":proxy")
