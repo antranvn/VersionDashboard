@@ -54,8 +54,10 @@ fun main() {
     embeddedServer(ServerCIO, port = PORT) {
         install(CORS) {
             anyHost() // DEV ONLY — fine for localhost, never ship this as-is.
-            allowHeader(HttpHeaders.ContentType)
             allowMethod(HttpMethod.Get)
+            allowMethod(HttpMethod.Options)
+            allowHeader(HttpHeaders.ContentType)
+            allowHeader(HttpHeaders.Authorization)
         }
         routing {
             // Transparently forward any /rest/* path to the Bitbucket host, preserving the query string.
