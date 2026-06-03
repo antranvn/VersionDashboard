@@ -1,4 +1,4 @@
-rootProject.name = "KotlinProject"
+rootProject.name = "VersionDashboard"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
